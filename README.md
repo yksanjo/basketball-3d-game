@@ -7,6 +7,58 @@ A fun and interactive 3D basketball shooting game built with React and Three.js!
 ![Three.js](https://img.shields.io/badge/Three.js-0.158-black?style=for-the-badge&logo=three.js)
 ![Vite](https://img.shields.io/badge/Vite-5.0-646CFF?style=for-the-badge&logo=vite)
 
+## 🎮 Live Demo
+
+Play the game live: **[Basketball 3D Game](https://basketball-3d-game.vercel.app)**
+
+> **Note**: If the live demo link doesn't work, the project can be easily deployed to Vercel, Netlify, or GitHub Pages. See deployment instructions below.
+
+## 📺 Gameplay Preview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                                                         │
+│                    🏀 SWISH! 🏀                        │
+│                 Great shot! +2 points!                 │
+│                                                         │
+│    [Ball flies through the air with rotation]           │
+│                    ⟳ 🏃 💨                              │
+│                                                         │
+│    [Power bar fills up]                                │
+│    ████████████░░░░░░░░░░░░░░░░░░░ 65%               │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+## ✨ New Features
+
+### 🔊 Sound Effects
+- **Swish sound** - When you score!
+- **Shoot sound** - Whoosh when ball is launched
+- **Power-up sounds** - Chimes when activating power-ups
+- Audio generated using Web Audio API (no external files needed)
+
+### 🏆 Leaderboard
+- Submit your score with your name
+- Compete against other players
+- Top 5 scores displayed
+- Persistent during gameplay session
+
+### ⚡ Power-Up System
+Collect glowing power-ups that appear randomly after scoring:
+
+| Power-Up | Color | Effect | Duration |
+|----------|-------|--------|----------|
+| **2X Points** | 🟡 Gold | Double your points per shot | 10 seconds |
+| **Super Shot** | 🔥 Orange | Triple points + stronger shots | 8 seconds |
+| **Slow Motion** | 🔵 Blue | Ball moves in slow motion | 12 seconds |
+
+### 📱 Mobile Touch Controls
+- Full touch support for mobile devices
+- Touch and hold to charge
+- Release to shoot
+- Responsive design adapts to screen size
+
 ## 🎮 Features
 
 - **3D Graphics**: Beautiful 3D basketball court with realistic hoop, backboard, and net
@@ -16,7 +68,6 @@ A fun and interactive 3D basketball shooting game built with React and Three.js!
 - **Accuracy Stats**: Track your shooting percentage
 - **Smooth Animations**: Fluid ball rotation and flight path
 - **Responsive Design**: Works on desktop and mobile devices
-- **Touch Support**: Play with mouse or touch controls
 
 ## 🎯 How to Play
 
@@ -24,7 +75,8 @@ A fun and interactive 3D basketball shooting game built with React and Three.js!
 2. **Watch the Power Bar**: The bar fills up - green (low), yellow (medium), red (high power)
 3. **Release to Shoot**: Let go to launch the basketball
 4. **Score Points**: Get the ball through the hoop to score!
-5. **Track Your Stats**: Monitor your score, total shots, and accuracy percentage
+5. **Collect Power-ups**: Hit glowing orbs for special abilities
+6. **Track Your Stats**: Monitor your score, total shots, and accuracy percentage
 
 ## 🚀 Quick Start
 
@@ -75,7 +127,7 @@ basketball-3d-game/
 └── package.json
 ```
 
-## 🎨 Game Mechanics
+## 🎮 Game Mechanics
 
 - **Ball Physics**: Gravity-based trajectory with realistic arc
 - **Collision Detection**: Precise scoring detection when ball passes through hoop
@@ -84,11 +136,28 @@ basketball-3d-game/
 
 ## 🌐 Deployment
 
-This project can be deployed to:
-- **Vercel**: Connect your GitHub repo
-- **Netlify**: Connect your GitHub repo  
-- **Railway**: Connect your GitHub repo
-- **GitHub Pages**: Enable in repository settings
+### Vercel (Recommended)
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Deploy
+vercel
+```
+
+Or connect your GitHub repo to Vercel for automatic deployments.
+
+### Netlify
+1. Connect your GitHub repo to Netlify
+2. Build settings:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+3. Deploy!
+
+### GitHub Pages
+1. Go to repository Settings
+2. Enable GitHub Pages
+3. Select "gh-pages" branch or use Actions
 
 ## 🤝 Contributing
 
@@ -111,4 +180,3 @@ If you like this project, please give it a ⭐ on GitHub!
 ---
 
 Made with ❤️ and 🏀
-

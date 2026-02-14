@@ -1,5 +1,96 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
+
+// Sound effects using Web Audio API
+const createSoundEffect = () => {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  
+  const playSound = (type) => {
+    try {
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      if (type === 'swish') {
+        // Swish sound - high frequency swoosh
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(200, audioContext.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } else if (type === 'shoot') {
+        // Shoot sound - whoosh
+        oscillator.type = 'triangle';
+        oscillator.frequency.setValueAtTime(300, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
+      } else if (type === 'miss') {
+        // Miss sound - low thud
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(150, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(50, audioContext.currentTime + 0.3);
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      } else if (type === 'powerup') {
+        // Power-up sound - ascending tone
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(800, audioContext.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.2);
+      } else if (type === 'activate') {
+        // Power-up activated - chime
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(523, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(659, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(784, audioContext.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+      }
+    } catch (e) {
+      console.log('Audio not available');
+    }
+  };
+  
+  return { playSound };
+};
+
+// Power-up types
+const POWERUPS = {
+  DOUBLE_POINTS: { name: '2X Points', color: '#FFD700', duration: 10000 },
+  SUPER_SHOT: { name: 'Super Shot', color: '#FF4500', duration: 8000 },
+  SLOW_MO: { name: 'Slow Motion', color: '#00BFFF', duration: 12000 },
+};
+
+// Leaderboard entry component
+const LeaderboardEntry = ({ entry, index }) => (
+  <div style={{
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 12px',
+    background: index === 0 ? 'rgba(255, 215, 0, 0.3)' : index === 1 ? 'rgba(192, 192, 192, 0.3)' : index === 2 ? 'rgba(205, 127, 50, 0.3)' : 'rgba(255,255,255,0.1)',
+    borderRadius: '5px',
+    marginBottom: '5px',
+    fontSize: '14px'
+  }}>
+    <span style={{ fontWeight: 'bold' }}>#{index + 1}</span>
+    <span>{entry.name}</span>
+    <span style={{ fontWeight: 'bold', color: '#4ade80' }}>{entry.score}</span>
+  </div>
+);
 
 const BasketballGame = () => {
   const mountRef = useRef(null);
@@ -11,12 +102,118 @@ const BasketballGame = () => {
   const isFlyingRef = useRef(false);
   const chargingRef = useRef(false);
   const chargeStartRef = useRef(0);
+  const soundRef = useRef(null);
+  const powerupRef = useRef(null);
+  const gravityRef = useRef(0.012);
   
   const [score, setScore] = useState(0);
   const [shots, setShots] = useState(0);
   const [power, setPower] = useState(0);
   const [isCharging, setIsCharging] = useState(false);
   const [message, setMessage] = useState('Click and hold to charge, release to shoot!');
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [playerName, setPlayerName] = useState('');
+  const [leaderboard, setLeaderboard] = useState([
+    { name: 'Pro Player', score: 25 },
+    { name: 'Basket Star', score: 18 },
+    { name: 'Court King', score: 15 },
+    { name: 'Hoop Master', score: 12 },
+    { name: 'Net Rocker', score: 10 },
+  ]);
+  const [activePowerup, setActivePowerup] = useState(null);
+  const [powerupPosition, setPowerupPosition] = useState(null);
+  const [showPowerupMessage, setShowPowerupMessage] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  
+  // Check for mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768 || 'ontouchstart' in window);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  
+  // Initialize sound
+  useEffect(() => {
+    soundRef.current = createSoundEffect();
+  }, []);
+  
+  // Spawn power-up randomly
+  const spawnPowerup = useCallback(() => {
+    if (powerupRef.current) return;
+    
+    const types = Object.keys(POWERUPS);
+    const randomType = types[Math.floor(Math.random() * types.length)];
+    const powerupData = POWERUPS[randomType];
+    
+    powerupRef.current = {
+      type: randomType,
+      ...powerupData,
+      position: new THREE.Vector3(
+        (Math.random() - 0.5) * 4,
+        1,
+        Math.random() * 2 + 3
+      )
+    };
+    
+    setPowerupPosition(powerupRef.current.position.clone());
+  }, []);
+  
+  // Activate power-up
+  const activatePowerup = useCallback((powerupType) => {
+    const powerupData = POWERUPS[powerupType];
+    setActivePowerup(powerupData);
+    setShowPowerupMessage(true);
+    setMessage(`🚀 ${powerupData.name} activated!`);
+    
+    if (soundRef.current) {
+      soundRef.current.playSound('activate');
+    }
+    
+    if (powerupType === 'SLOW_MO') {
+      gravityRef.current = 0.006; // Slow down gravity
+    }
+    
+    setTimeout(() => {
+      setActivePowerup(null);
+      setShowPowerupMessage(false);
+      gravityRef.current = 0.012;
+      setMessage('Click and hold to charge, release to shoot!');
+    }, powerupData.duration);
+    
+    powerupRef.current = null;
+    setPowerupPosition(null);
+  }, []);
+  
+  // Check power-up collision
+  const checkPowerupCollision = useCallback(() => {
+    if (!powerupRef.current || !ballRef.current) return;
+    
+    const ballPos = ballRef.current.position;
+    const powerupPos = powerupRef.current.position;
+    const distance = ballPos.distanceTo(powerupPos);
+    
+    if (distance < 0.5) {
+      if (soundRef.current) {
+        soundRef.current.playSound('powerup');
+      }
+      activatePowerup(powerupRef.current.type);
+    }
+  }, [activatePowerup]);
+  
+  // Submit score to leaderboard
+  const submitScore = useCallback(() => {
+    if (!playerName.trim() || score === 0) return;
+    
+    const newLeaderboard = [...leaderboard, { name: playerName, score }];
+    newLeaderboard.sort((a, b) => b.score - a.score);
+    setLeaderboard(newLeaderboard.slice(0, 5));
+    setPlayerName('');
+    setScore(0);
+    setShots(0);
+  }, [playerName, score, leaderboard]);
   
   useEffect(() => {
     if (!mountRef.current) return;
@@ -137,8 +334,28 @@ const BasketballGame = () => {
       const distToRim = ball.position.distanceTo(rimPos);
       
       if (distToRim < 0.5 && ball.position.y > 4.7 && ball.position.y < 5.3 && ballVelocityRef.current.y < 0) {
-        setScore(prev => prev + 1);
-        setMessage('SWISH! 🏀 Great shot!');
+        let points = 1;
+        // Apply power-up effects
+        if (activePowerup && activePowerup.name === '2X Points') {
+          points = 2;
+        }
+        if (activePowerup && activePowerup.name === 'Super Shot') {
+          points = 3;
+        }
+        setScore(prev => prev + points);
+        
+        if (soundRef.current) {
+          soundRef.current.playSound('swish');
+        }
+        
+        const pointText = points > 1 ? ` +${points} points!` : '';
+        setMessage(`SWISH! 🏀 Great shot!${pointText}`);
+        
+        // Spawn power-up after scoring
+        if (Math.random() < 0.3) {
+          setTimeout(() => spawnPowerup(), 500);
+        }
+        
         setTimeout(() => {
           setMessage('Click and hold to charge, release to shoot!');
         }, 2000);
@@ -153,7 +370,13 @@ const BasketballGame = () => {
       isFlyingRef.current = true;
       setShots(prev => prev + 1);
       
-      const force = 0.25 + (powerLevel * 0.20);
+      let force = 0.25 + (powerLevel * 0.20);
+      
+      // Apply power-up effects
+      if (activePowerup && activePowerup.name === 'Super Shot') {
+        force *= 1.3; // Stronger shots
+      }
+      
       const angle = Math.PI / 3.2;
       
       ballVelocityRef.current.set(
@@ -162,7 +385,81 @@ const BasketballGame = () => {
         -force * Math.cos(angle)
       );
       
+      if (soundRef.current) {
+        soundRef.current.playSound('shoot');
+      }
+      
       setMessage('Watch it fly!');
+    };
+    
+    // Check for power-up collision
+    const checkPowerupCollision = () => {
+      if (!powerupRef.current || !ballRef.current) return;
+      
+      const ballPos = ballRef.current.position;
+      const powerupPos = powerupRef.current.position;
+      const distance = ballPos.distanceTo(powerupPos);
+      
+      if (distance < 0.8) {
+        const powerupType = powerupRef.current.type;
+        const powerupData = POWERUPS[powerupType];
+        
+        if (soundRef.current) {
+          soundRef.current.playSound('powerup');
+        }
+        
+        setActivePowerup(powerupData);
+        setShowPowerupMessage(true);
+        setMessage(`🚀 ${powerupData.name} activated!`);
+        
+        if (powerupType === 'SLOW_MO') {
+          gravityRef.current = 0.006;
+        }
+        
+        setTimeout(() => {
+          setActivePowerup(null);
+          setShowPowerupMessage(false);
+          gravityRef.current = 0.012;
+          setMessage('Click and hold to charge, release to shoot!');
+        }, powerupData.duration);
+        
+        powerupRef.current = null;
+        setPowerupPosition(null);
+      }
+    };
+    
+    // Spawn power-up randomly
+    const spawnPowerup = () => {
+      if (powerupRef.current) return;
+      
+      const types = Object.keys(POWERUPS);
+      const randomType = types[Math.floor(Math.random() * types.length)];
+      const powerupData = POWERUPS[randomType];
+      
+      powerupRef.current = {
+        type: randomType,
+        ...powerupData,
+        mesh: null
+      };
+      
+      // Create power-up visual
+      const powerupGeometry = new THREE.OctahedronGeometry(0.25);
+      const powerupMaterial = new THREE.MeshStandardMaterial({ 
+        color: powerupData.color,
+        emissive: powerupData.color,
+        emissiveIntensity: 0.5
+      });
+      const powerupMesh = new THREE.Mesh(powerupGeometry, powerupMaterial);
+      powerupMesh.position.set(
+        (Math.random() - 0.5) * 3,
+        1.5,
+        Math.random() * 2 + 3
+      );
+      scene.add(powerupMesh);
+      powerupRef.current.mesh = powerupMesh;
+      powerupRef.current.position = powerupMesh.position;
+      
+      setPowerupPosition(powerupMesh.position.clone());
     };
     
     // Mouse events
@@ -202,6 +499,12 @@ const BasketballGame = () => {
         setPower(Math.min((chargeTime / 1.5) * 100, 100));
       }
       
+      // Animate power-up if it exists
+      if (powerupRef.current && powerupRef.current.mesh) {
+        powerupRef.current.mesh.rotation.y += 0.05;
+        powerupRef.current.mesh.rotation.x += 0.02;
+      }
+      
       // Ball physics
       if (isFlyingRef.current) {
         ballVelocityRef.current.y -= gravity;
@@ -209,12 +512,52 @@ const BasketballGame = () => {
         ball.rotation.x += 0.1;
         ball.rotation.z += 0.1;
         
+        // Check power-up collision
+        if (powerupRef.current && ballRef.current) {
+          const ballPos = ballRef.current.position;
+          const powerupPos = powerupRef.current.mesh.position;
+          const distance = ballPos.distanceTo(powerupPos);
+          
+          if (distance < 0.8) {
+            const powerupType = powerupRef.current.type;
+            const powerupData = POWERUPS[powerupType];
+            
+            if (soundRef.current) {
+              soundRef.current.playSound('powerup');
+            }
+            
+            // Remove power-up mesh from scene
+            scene.remove(powerupRef.current.mesh);
+            
+            setActivePowerup(powerupData);
+            setShowPowerupMessage(true);
+            setMessage(`🚀 ${powerupData.name} activated!`);
+            
+            if (powerupType === 'SLOW_MO') {
+              gravityRef.current = 0.006;
+            }
+            
+            setTimeout(() => {
+              setActivePowerup(null);
+              setShowPowerupMessage(false);
+              gravityRef.current = 0.012;
+              setMessage('Click and hold to charge, release to shoot!');
+            }, powerupData.duration);
+            
+            powerupRef.current = null;
+            setPowerupPosition(null);
+          }
+        }
+        
         const scored = checkScore();
         
         // Reset conditions
         if (ball.position.y < 0 || ball.position.z < -10 || Math.abs(ball.position.x) > 10) {
           if (!scored) {
             setMessage('Miss! Try again!');
+            if (soundRef.current) {
+              soundRef.current.playSound('miss');
+            }
             setTimeout(() => {
               setMessage('Click and hold to charge, release to shoot!');
             }, 1500);
@@ -311,25 +654,201 @@ const BasketballGame = () => {
       {/* Message */}
       <div style={{
         position: 'absolute',
-        bottom: '40px',
+        bottom: isMobile ? '80px' : '40px',
         left: '50%',
         transform: 'translateX(-50%)',
         color: 'white',
         fontFamily: 'Arial, sans-serif',
-        fontSize: '24px',
+        fontSize: isMobile ? '18px' : '24px',
         fontWeight: 'bold',
         textShadow: '3px 3px 6px rgba(0,0,0,0.9)',
         background: 'rgba(0,0,0,0.7)',
         padding: '15px 30px',
         borderRadius: '15px',
         textAlign: 'center',
-        minWidth: '300px'
+        minWidth: '300px',
+        maxWidth: '90%'
       }}>
         {message}
       </div>
+      
+      {/* Active Power-up Indicator */}
+      {activePowerup && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '20px',
+          transform: 'translateY(-50%)',
+          color: 'white',
+          fontFamily: 'Arial, sans-serif',
+          fontSize: '20px',
+          fontWeight: 'bold',
+          textShadow: '2px 2px 4px rgba(0,0,0,0.9)',
+          background: activePowerup.color,
+          padding: '15px 20px',
+          borderRadius: '10px',
+          animation: 'pulse 1s infinite'
+        }}>
+          ⭐ {activePowerup.name}
+        </div>
+      )}
+      
+      {/* Leaderboard Button */}
+      <button
+        onClick={() => setShowLeaderboard(!showLeaderboard)}
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
+          border: 'none',
+          padding: '12px 20px',
+          borderRadius: '10px',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          cursor: 'pointer',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.3)',
+          fontFamily: 'Arial, sans-serif'
+        }}
+      >
+        🏆 Leaderboard
+      </button>
+      
+      {/* Leaderboard Modal */}
+      {showLeaderboard && (
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: 'rgba(0,0,0,0.9)',
+          padding: '30px',
+          borderRadius: '20px',
+          minWidth: '300px',
+          maxWidth: '90%',
+          color: 'white',
+          fontFamily: 'Arial, sans-serif',
+          zIndex: 1000
+        }}>
+          <h2 style={{ textAlign: 'center', marginBottom: '20px', fontSize: '28px' }}>🏆 Leaderboard</h2>
+          
+          {leaderboard.map((entry, index) => (
+            <LeaderboardEntry key={index} entry={entry} index={index} />
+          ))}
+          
+          {/* Submit Score Form */}
+          {score > 0 && (
+            <div style={{ marginTop: '20px', borderTop: '1px solid #555', paddingTop: '20px' }}>
+              <p style={{ textAlign: 'center', marginBottom: '10px' }}>Your Score: <strong style={{ color: '#4ade80', fontSize: '24px' }}>{score}</strong></p>
+              <input
+                type="text"
+                placeholder="Enter your name"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '2px solid #667eea',
+                  background: 'rgba(255,255,255,0.1)',
+                  color: 'white',
+                  fontSize: '16px',
+                  marginBottom: '10px',
+                  boxSizing: 'border-box'
+                }}
+              />
+              <button
+                onClick={submitScore}
+                disabled={!playerName.trim()}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: playerName.trim() ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#555',
+                  color: 'white',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: playerName.trim() ? 'pointer' : 'not-allowed'
+                }}
+              >
+                Submit Score
+              </button>
+            </div>
+          )}
+          
+          <button
+            onClick={() => setShowLeaderboard(false)}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '15px',
+              background: 'transparent',
+              border: 'none',
+              color: 'white',
+              fontSize: '24px',
+              cursor: 'pointer'
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+      
+      {/* Mobile Touch Hint */}
+      {isMobile && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          color: 'rgba(255,255,255,0.6)',
+          fontSize: '14px',
+          fontFamily: 'Arial, sans-serif'
+        }}>
+          Touch and hold to charge • Release to shoot
+        </div>
+      )}
+      
+      {/* Power-up indicator in 3D scene */}
+      {powerupPosition && (
+        <div style={{
+          position: 'absolute',
+          top: '40%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          pointerEvents: 'none'
+        }}>
+          <div style={{
+            width: '30px',
+            height: '30px',
+            background: 'radial-gradient(circle, #FFD700 0%, #FF4500 100%)',
+            borderRadius: '50%',
+            animation: 'spin 2s linear infinite',
+            boxShadow: '0 0 20px #FFD700'
+          }} />
+        </div>
+      )}
+      
+      <style>{`
+        @keyframes pulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+          100% { transform: scale(1); }
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
 
 export default BasketballGame;
+
+
+
+
 
