@@ -1,5 +1,12 @@
 # basketball-3d-game
 
+Production-grade project scaffold focused on reliability, maintainability, and fast onboarding.
+
+[![CI](https://img.shields.io/github/actions/workflow/status/yksanjo/basketball-3d-game/ci.yml?branch=main&label=ci)](https://github.com/yksanjo/basketball-3d-game/actions)
+![License](https://img.shields.io/github/license/yksanjo/basketball-3d-game)
+![Last Commit](https://img.shields.io/github/last-commit/yksanjo/basketball-3d-game)
+![Repo Size](https://img.shields.io/github/repo-size/yksanjo/basketball-3d-game)
+
 ## Detailed Description
 
 basketball-3d-game is maintained as an industry-grade software project with production-ready engineering practices.  
